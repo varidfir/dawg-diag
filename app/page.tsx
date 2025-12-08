@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Trash2, RotateCcw, Stethoscope, History, Home, Moon, Sun, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -262,7 +262,7 @@ function App() {
                 type="checkbox"
                 checked={symptoms.includes(symptom)}
                 onChange={() => handleSymptomToggle(symptom)}
-                className="mt-1 w-5 h-5 accent-indigo-600 rounded focus:ring-indigo-500 flex-shrink-0"
+                className="mt-1 w-5 h-5 accent-indigo-600 rounded focus:ring-indigo-500 shrink-0"
               />
               <span className={`text-sm sm:text-base font-medium leading-tight ${symptoms.includes(symptom) ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-700 dark:text-gray-300'}`}>
                 {symptom}
@@ -282,7 +282,7 @@ function App() {
 
           <button
             onClick={handleReset}
-            className="px-6 py-3 rounded-xl border border-gray-300 dark:border-gray-600 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.97] transition flex items-center justify-center gap-2 text-gray-700 dark:text-gray-200"
+            className="px-6 py-3 rounded-xl border  dark:border-gray-600 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.97] transition flex items-center justify-center gap-2 text-gray-700 dark:text-gray-200"
           >
             <RotateCcw className="w-5 h-5" />
             Reset
@@ -323,7 +323,7 @@ function App() {
                 {diagnosisResult.results.map((result, index) => (
                   <div
                     key={result.id}
-                    className={`border-l-4 p-5 rounded-r-xl shadow-sm transition-all ${index === 0 ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/40 ring-1 ring-indigo-200 dark:ring-indigo-800' : 'border-gray-300 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 opacity-80 hover:opacity-100'}`}
+                    className={`border-l-4 p-5 rounded-r-xl shadow-sm transition-all ${index === 0 ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/40 ring-1 ring-indigo-200 dark:ring-indigo-800' : ' bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 opacity-80 hover:opacity-100'}`}
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div>
@@ -349,7 +349,7 @@ function App() {
               </div>
             </>
           ) : (
-            <div className="text-center py-10 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-dashed border-gray-300 dark:border-gray-600">
+            <div className="text-center py-10 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-dashed  dark:border-gray-600">
               <p className="text-gray-500 dark:text-gray-400 italic">
                 Tidak ada pola kerusakan yang cocok.<br/>Coba pilih gejala lain yang lebih spesifik.
               </p>
@@ -400,7 +400,7 @@ function App() {
               {item.results.length > 0 ? (
                 <div className="space-y-3">
                   <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Hasil Teratas:</p>
-                  {item.results.slice(0, 2).map((result, index) => (
+                  {item.results.slice(0, 2).map((result) => (
                     <div key={result.id} className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
                       <h4 className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
                         {result.nama_rule}
@@ -434,75 +434,72 @@ function App() {
 
   return (
     <div className={`${isDarkMode ? 'dark' : ''} overflow-x-hidden min-h-screen bg-gray-200 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans`}>
-      
-      {/* --- LANDING PAGE --- */}
-      {isLandingPage ? (
-        <div className="relative min-h-screen flex flex-col">
-          <header className="h-20 w-full px-6 sm:px-20 py-6 flex justify-between items-center z-10 bg-transparent">
-            <Link href="/" className="flex items-center gap-3">
-              <Image src="/logo.png" alt="logo" width={40} height={40} className="w-10 h-auto invert-0 dark:invert" />
-              <h1 className="text-xl font-bold tracking-tight">Dawg Diag</h1>
-            </Link>
-            <div className="flex items-center gap-4">
-              <button onClick={toggleTheme} className="p-2 rounded-full bg-white/20 hover:bg-white/40 dark:bg-black/20 dark:hover:bg-black/40 backdrop-blur transition" aria-label="Toggle Theme">
-                {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-              <Link href="https://github.com/rzlmiooo/dawg-diag" target='_blank'>
-                <Image src="/github.svg" alt="github" width={24} height={24} className="w-6 h-6 dark:invert opacity-80 hover:opacity-100 transition" />
+      {isLandingPage == true && (
+        <div className="relative min-h-screen bg-gray-200 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 text-sm">
+          <header className="h-20 w-dvw px-6 sm:px-96 py-6">
+            <nav className="flex justify-between items-center">
+              <Link href="/" className="flex justify-center items-center gap-4 sm:gap-8">
+                <Image src="/logo.png" alt="logo" width={200} height={100} className="invert-0 dark:invert w-12 h-auto" />
+                <h1>Dawg Diag</h1>
               </Link>
-            </div>
-          </header>
-
-          <main className="flex-1 flex flex-col items-center justify-center px-6 text-center z-10 pb-20">
-            <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
-              <div className="inline-block px-4 py-1.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-sm font-semibold mb-2">
-                🚀 Sistem Pakar Cihuy
-              </div>
-              <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-tight">
-                Deteksi Kerusakan Komputer <br/>
-                <span className="text-transparent bg-clip-text bg-linear-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
-                  Cepat & Akurat
-                </span>
-              </h1>
-              <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-                Gunakan metode Certainty Factor untuk menganalisis gejala perangkat keras Anda. Dapatkan solusi perbaikan instan tanpa perlu ke teknisi.
-              </p>
-              <div className="pt-4">
-                <button onClick={() => setLandingPage(false)} className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-lg font-bold rounded-full hover:scale-105 hover:shadow-2xl transition-all duration-300 flex items-center gap-2 mx-auto">
-                  Mulai Diagnosa Sekarang <span className="text-xl">→</span>
+              <div className="flex justify-center items-center gap-4 sm:gap-8">
+                <button
+                  onClick={toggleTheme}
+                  className="flex gap-4 items-center p-2.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-yellow-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  aria-label="Toggle Dark Mode"
+                  >
+                  {isDarkMode ?
+                    <>
+                      <Sun className="w-5 h-5" />
+                      <span className="hidden sm:block">
+                        Mode Terang
+                      </span>
+                    </> : 
+                    <>
+                      <Moon className="w-5 h-5" />
+                      <span className="hidden sm:block">
+                        Mode Gelap
+                      </span>
+                    </>
+                  }
                 </button>
+                <Link href="https://github.com/rzlmiooo/dawg-diag" target='_blank'>
+                    <Image src="/github.svg" alt="github" width={100} height={100} className='w-auto h-9 invert' />
+                </Link>
               </div>
+            </nav>
+          </header>
+          <main className="w-dvw h-full flex flex-col justify-center items-center">
+            <div className='p-6 pb-18 px-6 sm:px-48 flex flex-col justify-center items-center'>
+              <h1 className="pt-6 sm:pt-18 text-center text-xl sm:text-5xl tracking-tight leading-tight">Selamat Datang di <span className="px-3 dark:bg-gray-200 bg-gray-900 dark:text-gray-900 text-gray-100 font-semibold">Dawg Diag</span>
+              </h1>
+              <h2 className="text-2xl sm:text-3xl text-center pt-2 sm:pt-6">SISTEM DETEKSI DINI KERUSAKAN PADA KOMPUTER</h2>
+              <p className="pt-12 text-center">Sistem ini merupakan sistem pakar untuk mendiagnosa kerusakan pada komputer, yang dirancang untuk membantu pengguna mengenali gejala kerusakan perangkat secara cepat, mudah, dan akurat. Dengan metode Forward Chaining dan Certainty Factor, sistem ini mampu memberikan kemungkinan penyebab kerusakan serta solusi penanganan yang tepat sebelum perangkat dibawa ke teknisi. Melalui antarmuka yang sederhana dan ramah pengguna, sistem ini dapat digunakan oleh siapa saja, termasuk pengguna yang tidak memiliki pengetahuan teknis mendalam mengenai komputer.</p>
+              <button onClick={() => setLandingPage(false)} className="mt-8 px-3 py-2 flex w-fit dark:bg-gray-200 hover:bg-gray-2000 dark:hover:bg-gray-300 bg-gray-900 dark:text-gray-900 text-gray-100 text-3xl font-semibold transition-colors duration-300">Mulai Diagnosa</button>
             </div>
 
-            <div className="mt-20 w-full max-w-5xl">
-              <LogoScroll />
-            </div>
-
-            <div className="mt-24 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl w-full text-left">
-              <div className="p-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur rounded-2xl border border-gray-200 dark:border-gray-700">
-                <div className="text-3xl mb-3">👨‍💻</div>
-                <h3 className="font-bold text-lg mb-1">Mohammad Syfa EC</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Frontend Developer</p>
-              </div>
-              <div className="p-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur rounded-2xl border border-gray-200 dark:border-gray-700">
-                <div className="text-3xl mb-3">🛠️</div>
-                <h3 className="font-bold text-lg mb-1">Rizal Maulana</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Backend Developer</p>
-              </div>
-              <div className="p-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur rounded-2xl border border-gray-200 dark:border-gray-700">
-                <div className="text-3xl mb-3">🎨</div>
-                <h3 className="font-bold text-lg mb-1">Varid Firmansyah</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">UI/UX Designer</p>
-              </div>
+            <LogoScroll />
+            
+            <div className="hidden sm:flex gap-1 w-dvw items-center justify-center bg-gray-200 p-0.5 text-gray-50">
+              <div className="text-5xl text-gray-900 pr-6">Our <br/>Team</div>
+              <ul className="bg-gray-900 px-4 py-1 text-xl">
+                <li>Mohammad Syfa EC (2305101139)</li>
+                <li>Rizal Maulana (2305101018)</li>
+                <li>Varid Firmansyah (23051010xx)</li>
+              </ul>
+              <ul className="bg-gray-900 px-4 py-1 text-xl">
+                <li>as Frontend Developer</li>
+                <li>as Backend= Developer</li>
+                <li>as UI/UX Designer</li>
+              </ul>
             </div>
           </main>
-
-          <footer className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            &copy; 2025 Dawg Diag Team. All rights reserved.
+          <footer className="flex justify-center w-dvw py-8 text-sm">
+            Copyright(C) 2025. Rizal, Syfa, dan Varid
           </footer>
         </div>
-      ) : (
-        // --- APP MODE ---
+      )}
+      {isLandingPage == false && (
         <div className="min-h-screen flex flex-col">
           <nav className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-50 border-b dark:border-gray-700 transition-colors">
             <div className="max-w-5xl mx-auto px-4 py-3">
@@ -565,10 +562,8 @@ function App() {
           </footer>
         </div>
       )}
-
-      {/* === MODAL CONFIRMATION === */}
       {showModal && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6 border border-gray-200 dark:border-gray-700 transform scale-100 transition-all">
             <div className="flex flex-col items-center text-center mb-6">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4 text-red-600 dark:text-red-500">
