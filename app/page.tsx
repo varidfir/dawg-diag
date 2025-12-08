@@ -464,7 +464,7 @@ function App() {
                   }
                 </button>
                 <Link href="https://github.com/rzlmiooo/dawg-diag" target='_blank'>
-                    <Image src="/github.svg" alt="github" width={100} height={100} className='w-auto h-9 invert' />
+                    <Image src="/github.svg" alt="github" width={100} height={100} className='w-auto h-9 invert-0 dark:invert transition-all duration-300' />
                 </Link>
               </div>
             </nav>
@@ -475,7 +475,7 @@ function App() {
               </h1>
               <h2 className="text-2xl sm:text-3xl text-center pt-2 sm:pt-6">SISTEM DETEKSI DINI KERUSAKAN PADA KOMPUTER</h2>
               <p className="pt-12 text-center">Sistem ini merupakan sistem pakar untuk mendiagnosa kerusakan pada komputer, yang dirancang untuk membantu pengguna mengenali gejala kerusakan perangkat secara cepat, mudah, dan akurat. Dengan metode Forward Chaining dan Certainty Factor, sistem ini mampu memberikan kemungkinan penyebab kerusakan serta solusi penanganan yang tepat sebelum perangkat dibawa ke teknisi. Melalui antarmuka yang sederhana dan ramah pengguna, sistem ini dapat digunakan oleh siapa saja, termasuk pengguna yang tidak memiliki pengetahuan teknis mendalam mengenai komputer.</p>
-              <button onClick={() => setLandingPage(false)} className="mt-8 px-3 py-2 flex w-fit dark:bg-gray-200 hover:bg-gray-2000 dark:hover:bg-gray-300 bg-gray-900 dark:text-gray-900 text-gray-100 text-3xl font-semibold transition-colors duration-300">Mulai Diagnosa</button>
+              <button onClick={() => setLandingPage(false)} className="mt-8 px-3 py-2 flex w-fit dark:bg-gray-200 hover:bg-blue-500 dark:hover:bg-gray-300 bg-gray-900 dark:text-gray-900 text-gray-100 text-3xl font-semibold transition-colors duration-300">Mulai Diagnosa</button>
             </div>
 
             <LogoScroll />
@@ -489,7 +489,7 @@ function App() {
               </ul>
               <ul className="bg-gray-900 px-4 py-1 text-xl">
                 <li>as Frontend Developer</li>
-                <li>as Backend= Developer</li>
+                <li>as Backend Developer</li>
                 <li>as UI/UX Designer</li>
               </ul>
             </div>
