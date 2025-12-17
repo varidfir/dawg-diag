@@ -1,20 +1,29 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Trash2, RotateCcw, Stethoscope, History, Home, Moon, Sun, ArrowLeft } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Trash2, RotateCcw, Stethoscope, History, Home, Moon, Sun, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import LogoScroll from './components/LogoScroll';
 
 // --- TIPE DATA ---
-type Symptom = string;
+// Kita ubah struktur gejala user, bukan cuma string, tapi simpan nilai CF user-nya
+type UserSymptomSelection = {
+  [symptomName: string]: number; // key: nama gejala, value: cf user (0.4 - 1.0)
+};
+
+type RuleSymptom = {
+  nama: string;
+  cf: number; // CF Pakar
+};
 
 type ResultItem = {
   id: number;
   nama_rule: string;
   solusi: string;
-  cf_percentage: number;
+  cf_score: number; // Nilai asli 0-1 untuk sorting
+  cf_label: string; // Label (Sangat Yakin, dll)
   matching_symptoms: number;
   total_symptoms: number;
 };
@@ -22,131 +31,97 @@ type ResultItem = {
 type Diagnosis = {
   id: number;
   timestamp: string;
-  symptoms: Symptom[];
+  symptoms: string[]; // Simpan nama gejalanya saja untuk history
   results: ResultItem[];
 };
 
-// --- DATA RULES DENGAN BOBOT (HYBRID LOGIC) ---
-// Bobot (cf) menentukan seberapa "kuat" gejala tersebut menunjuk ke kerusakan.
-// Nilai 1.0 atau 0.95 berarti gejala itu SANGAT KHAS (bisa langsung vonis 100%).
+// --- KONSTANTA PILIHAN KEYAKINAN USER ---
+const USER_CONFIDENCE_OPTIONS = [
+  { label: "Sangat Yakin", value: 1.0, color: "bg-indigo-600 text-white border-indigo-600" },
+  { label: "Yakin", value: 0.8, color: "bg-blue-500 text-white border-blue-500" },
+  { label: "Cukup Yakin", value: 0.6, color: "bg-teal-500 text-white border-teal-500" },
+  { label: "Sedikit Ragu", value: 0.4, color: "bg-gray-400 text-white border-gray-400" }
+];
+
+// --- HELPER LABEL HASIL (PENGGANTI PERSENTASE) ---
+const getConfidenceLabel = (cf: number): string => {
+  if (cf >= 0.8) return "Sangat Yakin (Pasti)";
+  if (cf >= 0.6) return "Yakin (Kemungkinan Besar)";
+  if (cf >= 0.4) return "Cukup Yakin (Ada Potensi)";
+  return "Kurang Yakin (Kemungkinan Kecil)";
+};
+
+// --- DATA RULES (3 GEJALA PER DIAGNOSA) ---
 const RULES_DATA = [
   {
     id: 1,
-    nama_rule: "Power Supply (PSU) Bermasalah",
+    nama_rule: "Power Supply (PSU) Rusak",
     gejala: [
-      { nama: "Indikator lampu Power mati total", cf: 0.95 }, // Khas
-      { nama: "Kipas Power Supply tidak berputar", cf: 0.95 }, // Khas
-      { nama: "Komputer mati total tidak ada respon", cf: 0.8 },
-      { nama: "Sering mati mendadak saat beban berat", cf: 0.6 },
-      { nama: "Sudah ganti kabel power tetap mati", cf: 0.7 }
+      { nama: "Komputer mati total (Tidak ada respon sama sekali)", cf: 0.9 },
+      { nama: "Kipas Power Supply tidak berputar", cf: 0.9 },
+      { nama: "Indikator lampu di casing/motherboard mati total", cf: 0.8 }
     ],
-    solusi: "Cek kabel power. Tes PSU dengan jumper (kabel hijau+hitam). Jika kipas PSU mati, ganti PSU. Periksa kapasitor PSU.",
+    solusi: "Periksa kabel power. Tes PSU dengan jumper (kabel hijau+hitam). Jika kipas PSU mati, segera ganti PSU baru.",
   },
   {
     id: 2,
     nama_rule: "RAM (Memory) Rusak",
     gejala: [
-      { nama: "Bunyi beep panjang berulang (biasanya 3x)", cf: 0.99 }, // Sangat Khas RAM
-      { nama: "Blue Screen (BSOD) 'Memory Management'", cf: 0.9 },
-      { nama: "Gagal saat instalasi Windows (File Corrupt)", cf: 0.7 },
-      { nama: "Layar No Display tapi kipas menyala", cf: 0.6 }, 
-      { nama: "Komputer sering Restart sendiri", cf: 0.5 } 
+      { nama: "Bunyi beep panjang berulang (biasanya 3x)", cf: 0.95 },
+      { nama: "Layar tidak tampil (No Display) tapi kipas menyala", cf: 0.7 },
+      { nama: "Blue Screen (BSOD) saat pemakaian berat", cf: 0.8 }
     ],
-    solusi: "Bersihkan pin kuningan RAM dengan penghapus karet. Coba pindah slot RAM. Tes RAM satu per satu jika ada lebih dari satu keping.",
+    solusi: "Bersihkan pin kuningan RAM dengan penghapus karet. Coba pindah slot RAM. Tes RAM satu per satu.",
   },
   {
     id: 3,
     nama_rule: "Hard Disk / SSD Bermasalah",
     gejala: [
-      { nama: "Bunyi fisik 'tek-tek' atau 'klik' dari casing", cf: 0.99 }, // Sangat Khas HDD
-      { nama: "Pesan error 'Disk Boot Failure' / 'No Bootable Device'", cf: 0.9 },
-      { nama: "Proses booting Windows sangat lambat", cf: 0.6 },
-      { nama: "Sering macet/freeze saat buka Explorer", cf: 0.6 },
-      { nama: "Data sering rusak atau hilang sendiri", cf: 0.7 }
+      { nama: "Bunyi fisik 'tek-tek' atau 'klik' dari casing", cf: 0.95 },
+      { nama: "Proses booting Windows sangat lambat/gagal boot", cf: 0.8 },
+      { nama: "File sering corrupt atau hilang sendiri", cf: 0.7 }
     ],
-    solusi: "Segera backup data! Cek kesehatan disk dengan HDTune/Sentinel. Ganti kabel SATA atau ganti SSD secepatnya.",
+    solusi: "Segera backup data! Cek kesehatan disk dengan HDTune/Sentinel. Ganti kabel SATA atau ganti ke SSD.",
   },
   {
     id: 4,
     nama_rule: "Processor Overheat",
     gejala: [
-      { nama: "Suhu CPU di BIOS/Software > 85°C", cf: 1.0 }, // Pasti overheat
-      { nama: "Kipas prosesor berbunyi sangat bising", cf: 0.8 },
-      { nama: "Casing area prosesor sangat panas disentuh", cf: 0.7 },
-      { nama: "Komputer melambat (throttling) setelah lama dipakai", cf: 0.6 },
-      { nama: "Komputer mati mendadak saat main game", cf: 0.6 }
+      { nama: "Komputer mati mendadak saat main game/aplikasi berat", cf: 0.9 },
+      { nama: "Kipas prosesor berbunyi sangat bising/kencang", cf: 0.7 },
+      { nama: "Suhu CPU terdeteksi tinggi (>80°C) di BIOS", cf: 1.0 }
     ],
-    solusi: "Bersihkan debu heatsink. Ganti Thermal Paste prosesor. Pastikan sirkulasi udara casing bagus. Cek putaran fan CPU.",
+    solusi: "Bersihkan debu heatsink. Ganti Thermal Paste prosesor. Pastikan sirkulasi udara casing lancar.",
   },
   {
     id: 5,
     nama_rule: "VGA Card / GPU Rusak",
     gejala: [
-      { nama: "Layar pecah-pecah / garis-garis (Artefak)", cf: 0.99 }, // Sangat Khas VGA
-      { nama: "Resolusi layar tertahan kecil & tidak bisa diubah", cf: 0.8 },
-      { nama: "Driver VGA sering crash / has stopped working", cf: 0.8 },
-      { nama: "Game sering keluar sendiri (Force Close)", cf: 0.5 },
-      { nama: "Layar blank hitam tapi suara Windows ada", cf: 0.7 }
+      { nama: "Tampilan layar pecah/garis-garis (Artefak)", cf: 0.95 },
+      { nama: "Resolusi layar kecil & tidak bisa diubah", cf: 0.8 },
+      { nama: "Driver VGA sering crash/error", cf: 0.7 }
     ],
-    solusi: "Reseat (lepas-pasang) VGA. Bersihkan slot PCIe. Coba driver versi lain. Cek suhu VGA. Tes VGA di PC lain.",
+    solusi: "Reseat (lepas-pasang) VGA. Bersihkan slot PCIe. Coba driver versi lain. Cek suhu VGA.",
   },
   {
     id: 6,
     nama_rule: "Motherboard Bermasalah",
     gejala: [
-      { nama: "Fisik kapasitor terlihat kembung/bocor", cf: 0.99 }, // Sangat Khas
-      { nama: "Jam BIOS selalu reset (baterai baru)", cf: 0.8 },
-      { nama: "Port USB/Audio belakang mati sebagian", cf: 0.8 },
-      { nama: "Komputer nyala tapi tidak masuk BIOS (No POST)", cf: 0.6 },
-      { nama: "Sering Hang/Freeze total saat diam (Idle)", cf: 0.5 }
+      { nama: "Fisik kapasitor terlihat kembung/bocor", cf: 0.95 },
+      { nama: "Jam BIOS selalu reset ke tahun lama", cf: 0.8 },
+      { nama: "Port USB/Audio belakang tidak berfungsi", cf: 0.7 }
     ],
-    solusi: "Reset BIOS (Clear CMOS). Cek fisik motherboard. Jika kerusakan parah pada chipset, disarankan ganti motherboard.",
+    solusi: "Reset BIOS (Clear CMOS). Cek fisik motherboard. Jika kerusakan parah, ganti motherboard.",
   }
 ];
 
 // --- LOGIC CERTAINTY FACTOR ---
-// Rumus: CF_Baru = CF_Lama + CF_Gejala * (1 - CF_Lama)
 const cfCombine = (cfOld: number, cfGejala: number): number => {
   return cfOld + cfGejala * (1 - cfOld);
 };
 
-const calculateDiagnosis = (selectedSymptoms: Symptom[]) => {
-  const results: ResultItem[] = [];
-  
-  RULES_DATA.forEach(rule => {
-    // Filter gejala yang dipilih user DAN ada di rule ini
-    const matchingSymptoms = rule.gejala.filter(g => 
-      selectedSymptoms.includes(g.nama)
-    );
-    
-    if (matchingSymptoms.length > 0) {
-      let cfCombined = 0; // Nilai awal
-      
-      // Proses kombinasi CF
-      matchingSymptoms.forEach((gejala, index) => {
-        if (index === 0) {
-          cfCombined = gejala.cf; 
-        } else {
-          cfCombined = cfCombine(cfCombined, gejala.cf); 
-        }
-      });
-      
-      results.push({
-        id: rule.id,
-        nama_rule: rule.nama_rule,
-        solusi: rule.solusi,
-        // Pembulatan ke persen
-        cf_percentage: Math.round(cfCombined * 100), 
-        matching_symptoms: matchingSymptoms.length,
-        total_symptoms: rule.gejala.length
-      });
-    }
-  });
-  
-  return results.sort((a, b) => b.cf_percentage - a.cf_percentage);
-};
-
-const getAllSymptoms = (): Symptom[] => {
+// --- MENGAMBIL LIST GEJALA UNIK ---
+const getAllSymptoms = (): string[] => {
   const symptoms = new Set<string>();
   RULES_DATA.forEach(rule => {
     rule.gejala.forEach(g => symptoms.add(g.nama));
@@ -154,17 +129,17 @@ const getAllSymptoms = (): Symptom[] => {
   return Array.from(symptoms).sort();
 };
 
-// --- KOMPONEN UTAMA ---
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
-  const [symptoms, setSymptoms] = useState<Symptom[]>([]);
+  // State berubah: bukan array string, tapi object { "Gejala A": 0.8, "Gejala B": 0.4 }
+  const [userSelection, setUserSelection] = useState<UserSymptomSelection>({});
+  
   const [diagnosisResult, setDiagnosisResult] = useState<Diagnosis | null>(null);
   const [history, setHistory] = useState<Diagnosis[]>([]);
   const [allSymptoms] = useState(getAllSymptoms());
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLandingPage, setLandingPage] = useState(true);
   
-  // State untuk Modal Konfirmasi Hapus
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
@@ -172,7 +147,6 @@ function App() {
     if (savedHistory) {
       setHistory(JSON.parse(savedHistory));
     }
-
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
       setIsDarkMode(true);
@@ -187,25 +161,70 @@ function App() {
     localStorage.setItem('theme', newMode ? 'dark' : 'light');
   };
 
-  const handleSymptomToggle = (symptom: Symptom) => {
-    setSymptoms(prev => 
-      prev.includes(symptom) 
-        ? prev.filter(s => s !== symptom)
-        : [...prev, symptom]
-    );
+  // --- LOGIC MEMILIH GEJALA DAN BOBOT ---
+  const handleSymptomClick = (symptomName: string) => {
+    // Jika sudah ada, hapus (toggle off)
+    if (userSelection[symptomName]) {
+      const newSelection = { ...userSelection };
+      delete newSelection[symptomName];
+      setUserSelection(newSelection);
+    } else {
+      // Jika belum ada, tambahkan dengan nilai default (misal 0.8 - Yakin)
+      setUserSelection(prev => ({ ...prev, [symptomName]: 0.8 }));
+    }
   };
 
+  const handleConfidenceChange = (symptomName: string, value: number) => {
+    setUserSelection(prev => ({ ...prev, [symptomName]: value }));
+  };
+
+  // --- LOGIC DIAGNOSA ---
   const handleDiagnose = () => {
-    if (symptoms.length === 0) {
+    if (Object.keys(userSelection).length === 0) {
       alert('Pilih minimal 1 gejala untuk diagnosa');
       return;
     }
 
-    const results = calculateDiagnosis(symptoms);
+    const results: ResultItem[] = [];
+
+    RULES_DATA.forEach(rule => {
+      // Cari gejala di rule ini yang dipilih user
+      const matchingUserSymptoms = rule.gejala.filter(g => userSelection[g.nama] !== undefined);
+
+      if (matchingUserSymptoms.length > 0) {
+        let cfCombined = 0;
+
+        matchingUserSymptoms.forEach((gejalaRule, index) => {
+          // CF Gejala = CF Pakar * CF User
+          const userCF = userSelection[gejalaRule.nama];
+          const currentEvidenceCF = gejalaRule.cf * userCF;
+
+          if (index === 0) {
+            cfCombined = currentEvidenceCF;
+          } else {
+            cfCombined = cfCombine(cfCombined, currentEvidenceCF);
+          }
+        });
+
+        results.push({
+          id: rule.id,
+          nama_rule: rule.nama_rule,
+          solusi: rule.solusi,
+          cf_score: cfCombined,
+          cf_label: getConfidenceLabel(cfCombined),
+          matching_symptoms: matchingUserSymptoms.length,
+          total_symptoms: rule.gejala.length
+        });
+      }
+    });
+
+    // Urutkan berdasarkan score tertinggi
+    results.sort((a, b) => b.cf_score - a.cf_score);
+
     const diagnosis: Diagnosis = {
       id: Date.now(),
       timestamp: new Date().toISOString(),
-      symptoms: [...symptoms],
+      symptoms: Object.keys(userSelection), // Simpan nama gejala saja
       results
     };
 
@@ -217,11 +236,10 @@ function App() {
   };
 
   const handleReset = () => {
-    setSymptoms([]);
+    setUserSelection({});
     setDiagnosisResult(null);
   };
 
-  // Logic Hapus History
   const handleClearHistoryClick = () => setShowModal(true);
   const confirmDeleteHistory = () => {
     setHistory([]);
@@ -237,44 +255,77 @@ function App() {
           <Image src="/logo.png" alt="logo" width={50} height={50} className="w-12 h-auto invert-0 dark:invert" /> 
           Dawg Diag
         </h1>
-        <p className="text-gray-900 dark:text-gray-100 text-sm">Pilih gejala yang dialami. Satu gejala spesifik cukup untuk deteksi awal.</p>
+        <p className="text-gray-900 dark:text-gray-100 text-sm">Silakan pilih gejala yang Anda alami dan tentukan seberapa yakin Anda dengan gejala tersebut.</p>
       </div>
 
-      {/* LIST GEJALA */}
+      {/* LIST GEJALA DENGAN PILIHAN KEYAKINAN */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 border border-gray-100 dark:border-gray-700 transition-colors duration-300">
         <h2 className="text-xl font-semibold mb-5 flex items-center gap-4 text-gray-800 dark:text-gray-100">
           <Stethoscope className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-          Daftar Gejala:
+          Daftar Gejala & Keyakinan:
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-          {allSymptoms.map(symptom => (
-            <label
-              key={symptom}
-              className={`
-                flex items-start gap-3 p-4 border rounded-xl transition cursor-pointer shadow-sm hover:shadow-md 
-                ${symptoms.includes(symptom)
-                  ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 dark:border-indigo-500'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700/50 hover:border-indigo-500 dark:hover:border-indigo-400'}
-              `}
-            >
-              <input
-                type="checkbox"
-                checked={symptoms.includes(symptom)}
-                onChange={() => handleSymptomToggle(symptom)}
-                className="mt-1 w-5 h-5 accent-indigo-600 rounded focus:ring-indigo-500 shrink-0"
-              />
-              <span className={`text-sm sm:text-base font-medium leading-tight ${symptoms.includes(symptom) ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-700 dark:text-gray-300'}`}>
-                {symptom}
-              </span>
-            </label>
-          ))}
+        <div className="grid grid-cols-1 gap-4">
+          {allSymptoms.map(symptom => {
+            const isSelected = userSelection[symptom] !== undefined;
+            const currentVal = userSelection[symptom];
+
+            return (
+              <div 
+                key={symptom}
+                className={`
+                  border rounded-xl p-4 transition-all duration-300
+                  ${isSelected 
+                    ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 shadow-md' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-700'}
+                `}
+              >
+                {/* Bagian Klik Utama */}
+                <div 
+                  onClick={() => handleSymptomClick(symptom)}
+                  className="flex items-start gap-3 cursor-pointer"
+                >
+                  <div className={`mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-400'}`}>
+                    {isSelected && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                  </div>
+                  <span className={`text-base font-medium ${isSelected ? 'text-indigo-900 dark:text-indigo-200' : 'text-gray-700 dark:text-gray-300'}`}>
+                    {symptom}
+                  </span>
+                </div>
+
+                {/* Bagian Pilihan Keyakinan (Muncul Jika Dipilih) */}
+                {isSelected && (
+                  <div className="mt-4 pl-8 animate-fadeIn">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold uppercase tracking-wide">
+                      Seberapa yakin Anda mengalami gejala ini?
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {USER_CONFIDENCE_OPTIONS.map((option) => (
+                        <button
+                          key={option.label}
+                          onClick={() => handleConfidenceChange(symptom, option.value)}
+                          className={`
+                            px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium border transition-all
+                            ${currentVal === option.value 
+                              ? `${option.color} shadow-sm scale-105` 
+                              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'}
+                          `}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="flex flex-col md:flex-row gap-4 mt-8">
           <button
             onClick={handleDiagnose}
-            disabled={symptoms.length === 0}
+            disabled={Object.keys(userSelection).length === 0}
             className="flex-1 py-3 rounded-xl font-semibold text-gray-100 bg-linear-to-r from-indigo-600 to-purple-600 shadow-md hover:shadow-lg hover:brightness-110 active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Diagnosa Sekarang
@@ -282,7 +333,7 @@ function App() {
 
           <button
             onClick={handleReset}
-            className="px-6 py-3 rounded-xl border  dark:border-gray-600 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.97] transition flex items-center justify-center gap-2 text-gray-700 dark:text-gray-200"
+            className="px-6 py-3 rounded-xl border border-gray-300 dark:border-gray-600 font-medium hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.97] transition flex items-center justify-center gap-2 text-gray-700 dark:text-gray-200"
           >
             <RotateCcw className="w-5 h-5" />
             Reset
@@ -290,7 +341,7 @@ function App() {
         </div>
       </div>
 
-      {/* HASIL DIAGNOSA */}
+      {/* HASIL DIAGNOSA (LABEL ONLY, NO PERCENTAGE) */}
       {diagnosisResult && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 border border-gray-100 dark:border-gray-700 animate-fadeIn transition-colors duration-300 scroll-mt-20" id="result-section">
           <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-gray-100 flex items-center gap-2">
@@ -299,48 +350,48 @@ function App() {
 
           {diagnosisResult.results.length > 0 ? (
             <>
-              <div className="mb-8 h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={diagnosisResult.results} layout="vertical" margin={{ left: 0, right: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#374151' : '#e5e7eb'} horizontal={false} />
-                    <XAxis type="number" domain={[0, 100]} hide />
-                    <YAxis dataKey="nama_rule" type="category" width={10} tick={{fill: 'transparent'}} /> 
-                    <Tooltip 
-                      cursor={{fill: isDarkMode ? '#374151' : '#f3f4f6', opacity: 0.4}}
-                      contentStyle={{ 
-                        backgroundColor: isDarkMode ? '#1f2937' : '#fff', 
-                        borderColor: isDarkMode ? '#374151' : '#e5e7eb',
-                        color: isDarkMode ? '#fff' : '#000',
-                        borderRadius: '12px'
-                      }} 
-                    />
-                    <Bar dataKey="cf_percentage" fill="#6366f1" name="Kepastian (%)" radius={[0, 6, 6, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="space-y-4">
+              {/* Note: Chart dihapus/disederhanakan karena tidak pakai persentase angka */}
+              <div className="space-y-6">
                 {diagnosisResult.results.map((result, index) => (
                   <div
                     key={result.id}
-                    className={`border-l-4 p-5 rounded-r-xl shadow-sm transition-all ${index === 0 ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/40 ring-1 ring-indigo-200 dark:ring-indigo-800' : ' bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 opacity-80 hover:opacity-100'}`}
+                    className={`
+                      relative overflow-hidden border-l-4 p-6 rounded-r-xl shadow-sm transition-all
+                      ${index === 0 
+                        ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/40 ring-1 ring-indigo-200 dark:ring-indigo-800' 
+                        : 'border-gray-300 bg-white dark:bg-gray-800 border-t border-r border-b border-gray-100 dark:border-gray-700'}
+                    `}
                   >
-                    <div className="flex justify-between items-start mb-3">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
                       <div>
-                        <h3 className="font-bold text-gray-900 dark:text-white text-lg">
-                          {index + 1}. {result.nama_rule}
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg flex items-center gap-2">
+                          <span className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                            {index + 1}
+                          </span>
+                          {result.nama_rule}
                         </h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Cocok {result.matching_symptoms} dari {result.total_symptoms} gejala
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 ml-8">
+                          Berdasarkan {result.matching_symptoms} gejala yang cocok
                         </p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-sm font-bold shadow-sm ${result.cf_percentage >= 80 ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}>
-                        {result.cf_percentage}%
+                      
+                      {/* LABEL HASIL (Bukan Persen) */}
+                      <span className={`
+                        px-4 py-1.5 rounded-full text-sm font-bold shadow-sm whitespace-nowrap
+                        ${result.cf_score >= 0.8 ? 'bg-indigo-600 text-white' : 
+                          result.cf_score >= 0.6 ? 'bg-blue-500 text-white' :
+                          result.cf_score >= 0.4 ? 'bg-teal-500 text-white' :
+                          'bg-gray-400 text-white'}
+                      `}>
+                        {result.cf_label}
                       </span>
                     </div>
-                    <div className="bg-white/50 dark:bg-black/20 p-4 rounded-lg border border-indigo-100 dark:border-indigo-500/20">
+
+                    <div className="ml-0 sm:ml-8 bg-white/60 dark:bg-black/20 p-4 rounded-lg border border-indigo-100 dark:border-indigo-500/20">
                       <p className="text-gray-800 dark:text-gray-200 leading-relaxed">
-                        <strong className="text-indigo-600 dark:text-indigo-400 block mb-1">Solusi Perbaikan:</strong> 
+                        <strong className="text-indigo-600 dark:text-indigo-400 block mb-1 text-sm uppercase tracking-wide">
+                          Solusi & Penanganan:
+                        </strong> 
                         {result.solusi}
                       </p>
                     </div>
@@ -349,9 +400,9 @@ function App() {
               </div>
             </>
           ) : (
-            <div className="text-center py-10 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-dashed  dark:border-gray-600">
+            <div className="text-center py-10 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-dashed border-gray-300 dark:border-gray-600">
               <p className="text-gray-500 dark:text-gray-400 italic">
-                Tidak ada pola kerusakan yang cocok.<br/>Coba pilih gejala lain yang lebih spesifik.
+                Tidak ada pola kerusakan yang cocok.<br/>Pastikan Anda memilih gejala dengan benar.
               </p>
             </div>
           )}
@@ -400,13 +451,15 @@ function App() {
               {item.results.length > 0 ? (
                 <div className="space-y-3">
                   <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Hasil Teratas:</p>
-                  {item.results.slice(0, 2).map((result) => (
-                    <div key={result.id} className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
+                  {item.results.slice(0, 2).map((result, index) => (
+                    <div key={index} className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
                       <h4 className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
                         {result.nama_rule}
                       </h4>
-                      <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-xs font-bold">
-                        {result.cf_percentage}%
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${
+                        result.cf_score >= 0.8 ? 'bg-indigo-600 text-white' : 'bg-gray-500 text-white'
+                      }`}>
+                        {result.cf_label}
                       </span>
                     </div>
                   ))}
@@ -434,6 +487,8 @@ function App() {
 
   return (
     <div className={`${isDarkMode ? 'dark' : ''} overflow-x-hidden min-h-screen bg-gray-200 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans`}>
+      
+      {/* --- LANDING PAGE --- */}
       {isLandingPage == true && (
         <div className="relative min-h-screen bg-gray-200 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 text-sm">
           <header className="h-20 w-dvw px-6 sm:px-96 py-6">
@@ -443,32 +498,25 @@ function App() {
                 <h1>Dawg Diag</h1>
               </Link>
               <div className="flex justify-center items-center gap-4 sm:gap-8">
-                <button
-                  onClick={toggleTheme}
-                  className="flex gap-4 items-center p-2.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-yellow-400 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                  aria-label="Toggle Dark Mode"
-                  >
-                  {isDarkMode ?
+                <button onClick={toggleTheme} className="p-2 rounded-full bg-white/20 hover:bg-white/40 dark:bg-black/20 dark:hover:bg-black/40 backdrop-blur transition" aria-label="Toggle Theme">
+                  {isDarkMode ? 
                     <>
                       <Sun className="w-5 h-5" />
-                      <span className="hidden sm:block">
-                        Mode Terang
-                      </span>
+                      <span className="hidden sm:block">Mode Terang</span>
                     </> : 
                     <>
                       <Moon className="w-5 h-5" />
-                      <span className="hidden sm:block">
-                        Mode Gelap
-                      </span>
+                      <span className="hidden sm:block">Mode Gelap</span>
                     </>
                   }
                 </button>
                 <Link href="https://github.com/rzlmiooo/dawg-diag" target='_blank'>
-                    <Image src="/github.svg" alt="github" width={100} height={100} className='w-auto h-9 invert-0 dark:invert transition-all duration-300' />
+                  <Image src="/github.svg" alt="github" width={24} height={24} className="w-auto h-9 invert-0 dark:invert transition-all duration-300" />
                 </Link>
               </div>
             </nav>
           </header>
+
           <main className="w-dvw h-full flex flex-col justify-center items-center">
             <div className='p-6 pb-18 px-6 sm:px-48 flex flex-col justify-center items-center'>
               <h1 className="pt-6 sm:pt-18 text-center text-xl sm:text-5xl tracking-tight leading-tight">Selamat Datang di <span className="px-3 dark:bg-gray-200 bg-gray-900 dark:text-gray-900 text-gray-100 font-semibold">Dawg Diag</span>
@@ -494,11 +542,14 @@ function App() {
               </ul>
             </div>
           </main>
+
           <footer className="flex justify-center w-dvw py-8 text-sm">
             Copyright(C) 2025. Rizal, Syfa, dan Varid
           </footer>
         </div>
       )}
+
+      {/* --- APP MODE --- */}
       {isLandingPage == false && (
         <div className="min-h-screen flex flex-col">
           <nav className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-50 border-b dark:border-gray-700 transition-colors">
@@ -562,8 +613,10 @@ function App() {
           </footer>
         </div>
       )}
+
+      {/* === MODAL CONFIRMATION (CUSTOM BOX) === */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6 border border-gray-200 dark:border-gray-700 transform scale-100 transition-all">
             <div className="flex flex-col items-center text-center mb-6">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4 text-red-600 dark:text-red-500">
